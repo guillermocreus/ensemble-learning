@@ -9,6 +9,8 @@ class CART:
         self.root = None
         self.all_partitions = {}
         
+        self.importance = None
+        
     def _get_partitions(self, n):
         if n in self.all_partitions:
             return self.all_partitions[n]
@@ -60,8 +62,11 @@ class CART:
         return len(X1) / len(X) * self.Gini_X(X1, y1) + len(X2) / len(X) * self.Gini_X(X2, y2)
     
     def _best_split_G(self, X, y, features):
-        best_split = {'score': np.inf, 'feat': None, 'values_left': None, 'values_right': None}
-
+        best_split = {'score': np.inf, 
+                      'feat': None, 
+                      'values_left': None, 
+                      'values_right': None}
+        
         for feat in features:
             X_feat = X[:, feat]
             elems_col = np.unique(X_feat)
@@ -72,7 +77,7 @@ class CART:
                 values_left, values_right = elems_col[ind1], elems_col[~ind1]
                 current_split = (values_left, values_right)
                 score = self.Gini_X_A(X_feat, y, current_split)
-                print(current_split, score)
+                # print(current_split, score)
                 
                 if score < best_split['score']:
                     best_split['score'] = score
@@ -87,15 +92,18 @@ class CART:
         self.n_class_labels = len(np.unique(y))
 
         # stopping criteria
-        if self._is_finished(depth):
+        # Note: condition (X == X[0]).all() is used to remove amibguity
+        if self._is_finished(depth) or (X == X[0]).all():
             most_common_Label = np.argmax(np.bincount(y))
             return Node_G(value=most_common_Label)
 
         # get best split
         rnd_feats = np.random.choice(self.n_features, self.n_features, replace=False)
         best_feat, best_values_left, best_values_right = self._best_split_G(X, y, rnd_feats)
-
+        # print(f'Best split {best_feat, best_values_left, best_values_right}')
+        
         # grow children recursively
+        self.importance[best_feat] += 1
         left_idx, right_idx = self._create_split_G(X[:, best_feat], best_values_left, best_values_right)
         left_child = self._build_tree_G(X[left_idx, :], y[left_idx], depth + 1)
         right_child = self._build_tree_G(X[right_idx, :], y[right_idx], depth + 1)
@@ -110,7 +118,7 @@ class CART:
         return self._traverse_tree_G(x, node.right)
 
     def fit(self, X, y):
-        # self.root = self._build_tree(X, y)
+        self.importance = np.zeros(X.shape[1])
         self.root = self._build_tree_G(X, y)
 
     def predict(self, X):
